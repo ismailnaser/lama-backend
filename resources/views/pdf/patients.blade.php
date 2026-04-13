@@ -12,11 +12,12 @@
         table { width: 100%; border-collapse: collapse; table-layout: fixed; }
         th, td { border: 1px solid #111; padding: 6px 6px; vertical-align: middle; }
         th { background: #f3f4f6; font-weight: 700; }
-        .col-no { width: 7%; text-align: center; }
-        .col-id { width: 25%; }
-        .col-sex { width: 10%; text-align: center; }
-        .col-age { width: 10%; text-align: center; }
-        .col-ww { width: 48%; }
+        .col-no { width: 6%; text-align: center; }
+        .col-id { width: 18%; }
+        .col-sex { width: 8%; text-align: center; }
+        .col-age { width: 8%; text-align: center; }
+        .col-war { width: 10%; text-align: center; }
+        .col-notes { width: 50%; }
         .muted { color: #555; font-size: 10px; margin-top: 8px; }
     </style>
 </head>
@@ -33,7 +34,8 @@
             <th class="col-id">ID NO</th>
             <th class="col-sex">Sex</th>
             <th class="col-age">Age</th>
-            <th class="col-ww">WW</th>
+            <th class="col-war">WW</th>
+            <th class="col-notes">Notes</th>
         </tr>
         </thead>
         <tbody>
@@ -43,7 +45,8 @@
                 <td class="col-id">{{ $patient->id_no }}</td>
                 <td class="col-sex">{{ $patient->sex }}</td>
                 <td class="col-age">{{ $patient->age }}</td>
-                <td class="col-ww">{{ $patient->ww }}</td>
+                <td class="col-war">{{ $patient->ww ? 'Yes' : 'No' }}</td>
+                <td class="col-notes">{{ $patient->notes }}</td>
             </tr>
         @endforeach
 
@@ -53,7 +56,8 @@
                 <td class="col-id">&nbsp;</td>
                 <td class="col-sex">&nbsp;</td>
                 <td class="col-age">&nbsp;</td>
-                <td class="col-ww">&nbsp;</td>
+                <td class="col-war">&nbsp;</td>
+                <td class="col-notes">&nbsp;</td>
             </tr>
         @endfor
         </tbody>
@@ -64,4 +68,3 @@
     </div>
 </body>
 </html>
-

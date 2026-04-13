@@ -20,9 +20,8 @@ class PatientFactory extends Factory
             'id_no' => (string) $this->faker->numberBetween(100, 999999),
             'sex' => $this->faker->randomElement(['M', 'F']),
             'age' => $this->faker->numberBetween(1, 95),
-            'ww' => $this->faker->boolean(35)
-                ? $this->faker->sentence(3)
-                : null,
+            'ww' => $this->faker->boolean(25),
+            'notes' => $this->faker->boolean(40) ? $this->faker->sentence(4) : null,
             'created_at' => $createdAt,
             'updated_at' => $createdAt,
         ];

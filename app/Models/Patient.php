@@ -16,10 +16,12 @@ class Patient extends Model
         'sex',
         'age',
         'ww',
+        'notes',
     ];
 
     protected $casts = [
         'age' => 'integer',
+        'ww' => 'boolean',
     ];
 
     /**
@@ -27,8 +29,11 @@ class Patient extends Model
      */
     public function scopeFilter(Builder $query, array $filters): Builder
     {
+        $hasIdExact = !empty($filters['id_no_exact']);
         $hasId = !empty($filters['id_no']);
-        if ($hasId) {
+        if ($hasIdExact) {
+            $query->where('id_no', $filters['id_no_exact']);
+        } elseif ($hasId) {
             $query->where('id_no', 'like', '%'.$filters['id_no'].'%');
         }
 
@@ -36,7 +41,7 @@ class Patient extends Model
         $from = $filters['from_date'] ?? null;
         $to = $filters['to_date'] ?? null;
         $hasDateFilter = (bool) ($date || ($from && $to));
-        $hasAnyFilter = $hasId || $hasDateFilter;
+        $hasAnyFilter = $hasId || $hasIdExact || $hasDateFilter;
 
         if ($from && $to) {
             $start = CarbonImmutable::parse($from)->startOfDay();
@@ -50,7 +55,7 @@ class Patient extends Model
         }
 
         // If searching by ID without a date filter, do NOT constrain by date.
-        if ($hasId && !$hasDateFilter) {
+        if (($hasId || $hasIdExact) && !$hasDateFilter) {
             return $query;
         }
 

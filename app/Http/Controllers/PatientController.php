@@ -37,12 +37,20 @@ class PatientController extends Controller
             'id_no' => ['required', 'string', 'max:50'],
             'sex' => ['required', 'in:M,F'],
             'age' => ['required', 'integer', 'min:0', 'max:150'],
-            'ww' => ['nullable', 'string', 'max:255'],
+            'ww' => ['sometimes', 'boolean'],
+            'notes' => ['nullable', 'string', 'max:5000'],
         ]);
 
-        if (Patient::query()->where('id_no', $data['id_no'])->exists()) {
+        $data['id_no'] = trim($data['id_no']);
+
+        $duplicateToday = Patient::query()
+            ->where('id_no', $data['id_no'])
+            ->whereDate('created_at', CarbonImmutable::now())
+            ->exists();
+
+        if ($duplicateToday) {
             return response()->json([
-                'message' => 'Patient already exists.',
+                'message' => 'This ID number is already registered today.',
             ], 409);
         }
 
@@ -59,8 +67,24 @@ class PatientController extends Controller
             'id_no' => ['sometimes', 'string', 'max:50'],
             'sex' => ['sometimes', 'in:M,F'],
             'age' => ['sometimes', 'integer', 'min:0', 'max:150'],
-            'ww' => ['nullable', 'string', 'max:255'],
+            'ww' => ['sometimes', 'boolean'],
+            'notes' => ['nullable', 'string', 'max:5000'],
         ]);
+
+        if (array_key_exists('id_no', $data)) {
+            $data['id_no'] = trim($data['id_no']);
+            $day = CarbonImmutable::parse($patient->created_at)->toDateString();
+            $conflict = Patient::query()
+                ->where('id_no', $data['id_no'])
+                ->whereDate('created_at', $day)
+                ->where('id', '!=', $patient->id)
+                ->exists();
+            if ($conflict) {
+                return response()->json([
+                    'message' => 'This ID number is already used for another record on the same day.',
+                ], 409);
+            }
+        }
 
         $patient->update($data);
 
@@ -104,7 +128,7 @@ class PatientController extends Controller
         $patients = Patient::query()
             ->filter($filters)
             ->oldest()
-            ->get(['id_no', 'sex', 'age', 'ww', 'created_at']);
+            ->get(['id_no', 'sex', 'age', 'ww', 'notes', 'created_at']);
 
         $titleDate = $this->filtersToTitleDate($filters);
         $filename = 'surgical-dressing-log-'.$titleDate.'.csv';
@@ -122,6 +146,7 @@ class PatientController extends Controller
             $escape('ID No'),
             $escape('Sex'),
             $escape('Age'),
+            $escape('WW'),
             $escape('Notes'),
             $escape('Date'),
             $escape('Time'),
@@ -132,7 +157,8 @@ class PatientController extends Controller
                 $escape((string) $p->id_no),
                 $escape((string) $p->sex),
                 $escape((string) $p->age),
-                $escape($p->ww),
+                $escape($p->ww ? 'Yes' : 'No'),
+                $escape($p->notes),
                 $escape(optional($p->created_at)?->format('d-M-Y')),
                 $escape(optional($p->created_at)?->format('H:i')),
             ]);
@@ -152,6 +178,7 @@ class PatientController extends Controller
     {
         $validator = Validator::make($request->query(), [
             'id_no' => ['nullable', 'string', 'max:50'],
+            'id_no_exact' => ['nullable', 'string', 'max:50'],
             'date' => ['nullable', 'date_format:Y-m-d'],
             'from_date' => ['nullable', 'date_format:Y-m-d'],
             'to_date' => ['nullable', 'date_format:Y-m-d'],
