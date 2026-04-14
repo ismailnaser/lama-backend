@@ -16,11 +16,11 @@ Route::middleware('auth.token')->group(function () {
     Route::post('/patients', [PatientController::class, 'store']);
     Route::patch('/patients/{patient}', [PatientController::class, 'update']);
     Route::delete('/patients/{patient}', [PatientController::class, 'destroy']);
-    Route::get('/patients/{patient}/audits', [PatientController::class, 'audits']);
     Route::get('/patients/pdf', [PatientController::class, 'pdf']);
     Route::get('/patients/excel', [PatientController::class, 'excel']);
 
     Route::middleware('admin')->group(function () {
+        Route::get('/patients/{patient}/audits', [PatientController::class, 'audits']);
         Route::get('/users', [UserAdminController::class, 'index']);
         Route::post('/users', [UserAdminController::class, 'store']);
     });
