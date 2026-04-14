@@ -13,8 +13,14 @@ return Application::configure(basePath: dirname(__DIR__))
         apiPrefix: 'api',
         health: '/up',
     )
+    // ->withMiddleware(function (Middleware $middleware) {
+    //     $middleware->append(Cors::class);
+    // })
+
     ->withMiddleware(function (Middleware $middleware) {
-        $middleware->append(Cors::class);
+        $middleware->validateCsrfTokens(except: [
+            'api/*', // استثناء مسارات الـ API من حماية CSRF
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {
         //
