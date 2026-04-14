@@ -39,11 +39,17 @@ class ApiTokenAuth
                 'users.username',
                 'users.email',
                 'users.role',
+                'users.is_active',
             ])
             ->first();
 
         if (!$row) {
             return response()->json(['message' => 'Unauthenticated.'], 401);
+        }
+
+        if (isset($row->is_active) && !$row->is_active) {
+            DB::table('api_tokens')->where('id', $row->token_id)->delete();
+            return response()->json(['message' => 'Account is disabled.'], 403);
         }
 
         if ($row->expires_at !== null && now()->greaterThan($row->expires_at)) {
@@ -58,6 +64,7 @@ class ApiTokenAuth
             'username' => (string) ($row->username ?? ''),
             'email' => (string) ($row->email ?? ''),
             'role' => (string) ($row->role ?? 'user'),
+            'is_active' => (bool) ($row->is_active ?? true),
         ]);
         $request->attributes->set('auth_token_id', (int) $row->token_id);
 

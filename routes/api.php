@@ -23,6 +23,8 @@ Route::middleware('auth.token')->group(function () {
         Route::get('/patients/{patient}/audits', [PatientController::class, 'audits']);
         Route::get('/users', [UserAdminController::class, 'index']);
         Route::post('/users', [UserAdminController::class, 'store']);
+        Route::patch('/users/{user}', [UserAdminController::class, 'update']);
+        Route::delete('/users/{user}', [UserAdminController::class, 'destroy']);
     });
 });
 

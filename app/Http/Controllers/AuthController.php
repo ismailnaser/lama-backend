@@ -20,11 +20,15 @@ class AuthController extends Controller
 
         $user = DB::table('users')
             ->where('username', $username)
-            ->select(['id', 'name', 'username', 'email', 'role', 'password'])
+            ->select(['id', 'name', 'username', 'email', 'role', 'password', 'is_active'])
             ->first();
 
         if (!$user || !Hash::check($data['password'], $user->password)) {
             return response()->json(['message' => 'Invalid credentials.'], 422);
+        }
+
+        if (isset($user->is_active) && !$user->is_active) {
+            return response()->json(['message' => 'Account is disabled.'], 422);
         }
 
         $plain = rtrim(strtr(base64_encode(random_bytes(32)), '+/', '-_'), '=');
@@ -47,6 +51,7 @@ class AuthController extends Controller
                 'username' => (string) ($user->username ?? ''),
                 'email' => (string) ($user->email ?? ''),
                 'role' => (string) ($user->role ?? 'user'),
+                'is_active' => (bool) ($user->is_active ?? true),
             ],
         ]);
     }
