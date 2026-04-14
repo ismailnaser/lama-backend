@@ -11,6 +11,11 @@ class User extends Authenticatable
 {
     use HasFactory, Notifiable;
 
+    public function isAdmin(): bool
+    {
+        return ($this->role ?? 'user') === 'admin';
+    }
+
     /**
      * The attributes that are mass assignable.
      *
@@ -18,8 +23,10 @@ class User extends Authenticatable
      */
     protected $fillable = [
         'name',
+        'username',
         'email',
         'password',
+        'role',
     ];
 
     /**

@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Models\Patient;
+use App\Models\PatientAuditLog;
+use App\Support\AuthUser;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
@@ -10,6 +12,16 @@ use Barryvdh\DomPDF\Facade\Pdf;
 
 class PatientController extends Controller
 {
+    public function audits(Request $request, Patient $patient)
+    {
+        $logs = PatientAuditLog::query()
+            ->where('patient_id', $patient->id)
+            ->latest()
+            ->get(['id', 'action', 'username', 'user_id', 'changes', 'created_at']);
+
+        return response()->json(['data' => $logs]);
+    }
+
     public function count()
     {
         return response()->json([
@@ -56,6 +68,18 @@ class PatientController extends Controller
 
         $patient = Patient::create($data);
 
+        $u = AuthUser::fromRequest($request);
+        PatientAuditLog::create([
+            'patient_id' => $patient->id,
+            'user_id' => $u?->id,
+            'username' => $u?->username,
+            'action' => 'created',
+            'changes' => [
+                'before' => null,
+                'after' => $patient->only(['id_no', 'sex', 'age', 'ww', 'notes']),
+            ],
+        ]);
+
         return response()->json([
             'data' => $patient,
         ], 201);
@@ -63,6 +87,8 @@ class PatientController extends Controller
 
     public function update(Request $request, Patient $patient)
     {
+        $before = $patient->only(['id_no', 'sex', 'age', 'ww', 'notes']);
+
         $data = $request->validate([
             'id_no' => ['sometimes', 'string', 'max:50'],
             'sex' => ['sometimes', 'in:M,F'],
@@ -88,6 +114,19 @@ class PatientController extends Controller
 
         $patient->update($data);
 
+        $after = $patient->fresh()->only(['id_no', 'sex', 'age', 'ww', 'notes']);
+        $u = AuthUser::fromRequest($request);
+        PatientAuditLog::create([
+            'patient_id' => $patient->id,
+            'user_id' => $u?->id,
+            'username' => $u?->username,
+            'action' => 'updated',
+            'changes' => [
+                'before' => $before,
+                'after' => $after,
+            ],
+        ]);
+
         return response()->json([
             'data' => $patient->fresh(),
         ]);
@@ -95,6 +134,20 @@ class PatientController extends Controller
 
     public function destroy(Patient $patient)
     {
+        $before = $patient->only(['id_no', 'sex', 'age', 'ww', 'notes']);
+        $u = AuthUser::fromRequest(request());
+
+        PatientAuditLog::create([
+            'patient_id' => $patient->id,
+            'user_id' => $u?->id,
+            'username' => $u?->username,
+            'action' => 'deleted',
+            'changes' => [
+                'before' => $before,
+                'after' => null,
+            ],
+        ]);
+
         $patient->delete();
 
         return response()->noContent();
