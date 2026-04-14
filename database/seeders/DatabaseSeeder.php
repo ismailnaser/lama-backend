@@ -17,14 +17,20 @@ class DatabaseSeeder extends Seeder
     {
         $adminUsername = env('ADMIN_USERNAME');
         $adminPassword = env('ADMIN_PASSWORD');
+        $adminEmail = env('ADMIN_EMAIL');
+
         if (is_string($adminUsername) && trim($adminUsername) !== '' && is_string($adminPassword) && trim($adminPassword) !== '') {
             $adminUsername = trim($adminUsername);
             $exists = DB::table('users')->where('username', $adminUsername)->exists();
             if (!$exists) {
+                $email = is_string($adminEmail) && trim($adminEmail) !== ''
+                    ? trim($adminEmail)
+                    : ($adminUsername.'@example.com');
+
                 DB::table('users')->insert([
                     'name' => 'Admin',
                     'username' => $adminUsername,
-                    'email' => null,
+                    'email' => $email,
                     'password' => Hash::make($adminPassword),
                     'role' => 'admin',
                     'created_at' => now(),
