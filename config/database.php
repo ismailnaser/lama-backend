@@ -107,6 +107,7 @@ return [
     'prefix_indexes' => true,
     'search_path' => env('DB_SCHEMA', 'public'),
     'sslmode' => 'require', // غيرها من prefer لـ require عشان ديجيتال أوشن
+    'schema' => env('DB_SCHEMA', 'public'),
 ],
 
         'sqlsrv' => [
