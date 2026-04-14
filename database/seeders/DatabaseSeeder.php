@@ -2,7 +2,6 @@
 
 namespace Database\Seeders;
 
-use App\Models\Patient;
 // use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -27,6 +26,10 @@ class DatabaseSeeder extends Seeder
                     ? trim($adminEmail)
                     : ($adminUsername.'@example.com');
 
+                if (DB::table('users')->where('email', $email)->exists()) {
+                    $email = $adminUsername.'+admin@example.com';
+                }
+
                 DB::table('users')->insert([
                     'name' => 'Admin',
                     'username' => $adminUsername,
@@ -38,11 +41,5 @@ class DatabaseSeeder extends Seeder
                 ]);
             }
         }
-
-        // Seed lots of patients for quick UI testing & filtering
-        // - A guaranteed chunk for "today" so default view isn't empty
-        // - The rest spread across the last ~90 days for date-range filters
-        Patient::factory()->today()->count(200)->create();
-        Patient::factory()->count(300)->create();
     }
 }
