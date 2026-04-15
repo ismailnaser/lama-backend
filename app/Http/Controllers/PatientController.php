@@ -196,13 +196,24 @@ class PatientController extends Controller
             return '"'.$v.'"';
         };
 
-        $lines = [];
-        $total = $patients->count();
+        // Use semicolon delimiter for better Excel compatibility on many Windows/Arabic locales.
+        $delim = ';';
 
-        foreach ($patients as $idx => $p) {
-            $no = $total - $idx; // start numbering from total cases
-            $lines[] = implode(',', [
-                $escape((string) $no),
+        $lines = [];
+        $lines[] = implode($delim, [
+            $escape('ID No'),
+            $escape('Sex'),
+            $escape('Age'),
+            $escape('WW'),
+            $escape('Lab'),
+            $escape('Burn'),
+            $escape('Notes'),
+            $escape('Date'),
+            $escape('Time'),
+        ]);
+
+        foreach ($patients as $p) {
+            $lines[] = implode($delim, [
                 $escape((string) $p->id_no),
                 $escape((string) $p->sex),
                 $escape((string) $p->age),
