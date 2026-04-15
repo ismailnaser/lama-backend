@@ -205,6 +205,7 @@ class PatientController extends Controller
 
         $lines = [];
         $lines[] = implode($delim, [
+            $escape('No'),
             $escape('ID No'),
             $escape('Sex'),
             $escape('Age'),
@@ -216,8 +217,9 @@ class PatientController extends Controller
             $escape('Time'),
         ]);
 
-        foreach ($patients as $p) {
+        foreach ($patients as $idx => $p) {
             $lines[] = implode($delim, [
+                $escape((string) ($idx + 1)),
                 $escape((string) $p->id_no),
                 $escape((string) $p->sex),
                 $escape((string) $p->age),
