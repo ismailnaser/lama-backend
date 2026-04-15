@@ -186,6 +186,10 @@ class PatientController extends Controller
             ->filter($filters)
             ->oldest()
             ->get(['id_no', 'sex', 'age', 'ww', 'lab', 'burn', 'notes', 'created_at']);
+        // Safety: drop any legacy rows missing an ID so Excel doesn't show a blank first row.
+        $patients = $patients
+            ->filter(fn ($p) => trim((string) ($p->id_no ?? '')) !== '')
+            ->values();
 
         $titleDate = $this->filtersToTitleDate($filters);
         $filename = 'surgical-dressing-log-'.$titleDate.'.csv';
