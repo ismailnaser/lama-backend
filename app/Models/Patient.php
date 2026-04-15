@@ -16,12 +16,16 @@ class Patient extends Model
         'sex',
         'age',
         'ww',
+        'lab',
+        'burn',
         'notes',
     ];
 
     protected $casts = [
         'age' => 'integer',
         'ww' => 'boolean',
+        'lab' => 'boolean',
+        'burn' => 'boolean',
     ];
 
     /**

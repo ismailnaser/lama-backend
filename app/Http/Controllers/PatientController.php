@@ -50,6 +50,8 @@ class PatientController extends Controller
             'sex' => ['required', 'in:M,F'],
             'age' => ['required', 'integer', 'min:0', 'max:150'],
             'ww' => ['sometimes', 'boolean'],
+            'lab' => ['sometimes', 'boolean'],
+            'burn' => ['sometimes', 'boolean'],
             'notes' => ['nullable', 'string', 'max:5000'],
         ]);
 
@@ -76,7 +78,7 @@ class PatientController extends Controller
             'action' => 'created',
             'changes' => [
                 'before' => null,
-                'after' => $patient->only(['id_no', 'sex', 'age', 'ww', 'notes']),
+                'after' => $patient->only(['id_no', 'sex', 'age', 'ww', 'lab', 'burn', 'notes']),
             ],
         ]);
 
@@ -87,13 +89,15 @@ class PatientController extends Controller
 
     public function update(Request $request, Patient $patient)
     {
-        $before = $patient->only(['id_no', 'sex', 'age', 'ww', 'notes']);
+        $before = $patient->only(['id_no', 'sex', 'age', 'ww', 'lab', 'burn', 'notes']);
 
         $data = $request->validate([
             'id_no' => ['sometimes', 'string', 'max:50'],
             'sex' => ['sometimes', 'in:M,F'],
             'age' => ['sometimes', 'integer', 'min:0', 'max:150'],
             'ww' => ['sometimes', 'boolean'],
+            'lab' => ['sometimes', 'boolean'],
+            'burn' => ['sometimes', 'boolean'],
             'notes' => ['nullable', 'string', 'max:5000'],
         ]);
 
@@ -114,7 +118,7 @@ class PatientController extends Controller
 
         $patient->update($data);
 
-        $after = $patient->fresh()->only(['id_no', 'sex', 'age', 'ww', 'notes']);
+        $after = $patient->fresh()->only(['id_no', 'sex', 'age', 'ww', 'lab', 'burn', 'notes']);
         $u = AuthUser::fromRequest($request);
         PatientAuditLog::create([
             'patient_id' => $patient->id,
@@ -134,7 +138,7 @@ class PatientController extends Controller
 
     public function destroy(Patient $patient)
     {
-        $before = $patient->only(['id_no', 'sex', 'age', 'ww', 'notes']);
+        $before = $patient->only(['id_no', 'sex', 'age', 'ww', 'lab', 'burn', 'notes']);
         $u = AuthUser::fromRequest(request());
 
         PatientAuditLog::create([
@@ -181,7 +185,7 @@ class PatientController extends Controller
         $patients = Patient::query()
             ->filter($filters)
             ->oldest()
-            ->get(['id_no', 'sex', 'age', 'ww', 'notes', 'created_at']);
+            ->get(['id_no', 'sex', 'age', 'ww', 'lab', 'burn', 'notes', 'created_at']);
 
         $titleDate = $this->filtersToTitleDate($filters);
         $filename = 'surgical-dressing-log-'.$titleDate.'.csv';
@@ -193,13 +197,13 @@ class PatientController extends Controller
         };
 
         $lines = [];
-        // Force Excel to use comma as delimiter, regardless of OS locale.
-        $lines[] = 'sep=,';
         $lines[] = implode(',', [
             $escape('ID No'),
             $escape('Sex'),
             $escape('Age'),
             $escape('WW'),
+            $escape('Lab'),
+            $escape('Burn'),
             $escape('Notes'),
             $escape('Date'),
             $escape('Time'),
@@ -211,6 +215,8 @@ class PatientController extends Controller
                 $escape((string) $p->sex),
                 $escape((string) $p->age),
                 $escape($p->ww ? 'Yes' : 'No'),
+                $escape($p->lab ? 'Yes' : 'No'),
+                $escape($p->burn ? 'Yes' : 'No'),
                 $escape($p->notes),
                 $escape(optional($p->created_at)?->format('d-M-Y')),
                 $escape(optional($p->created_at)?->format('H:i')),

@@ -16,8 +16,10 @@
         .col-id { width: 18%; }
         .col-sex { width: 8%; text-align: center; }
         .col-age { width: 8%; text-align: center; }
-        .col-war { width: 10%; text-align: center; }
-        .col-notes { width: 50%; }
+        .col-war { width: 7%; text-align: center; }
+        .col-lab { width: 7%; text-align: center; }
+        .col-burn { width: 7%; text-align: center; }
+        .col-notes { width: 39%; }
         .muted { color: #555; font-size: 10px; margin-top: 8px; }
     </style>
 </head>
@@ -35,6 +37,8 @@
             <th class="col-sex">Sex</th>
             <th class="col-age">Age</th>
             <th class="col-war">WW</th>
+            <th class="col-lab">Lab</th>
+            <th class="col-burn">Burn</th>
             <th class="col-notes">Notes</th>
         </tr>
         </thead>
@@ -46,6 +50,8 @@
                 <td class="col-sex">{{ $patient->sex }}</td>
                 <td class="col-age">{{ $patient->age }}</td>
                 <td class="col-war">{{ $patient->ww ? 'Yes' : 'No' }}</td>
+                <td class="col-lab">{{ $patient->lab ? 'Yes' : 'No' }}</td>
+                <td class="col-burn">{{ $patient->burn ? 'Yes' : 'No' }}</td>
                 <td class="col-notes">{{ $patient->notes }}</td>
             </tr>
         @endforeach
@@ -57,6 +63,8 @@
                 <td class="col-sex">&nbsp;</td>
                 <td class="col-age">&nbsp;</td>
                 <td class="col-war">&nbsp;</td>
+                <td class="col-lab">&nbsp;</td>
+                <td class="col-burn">&nbsp;</td>
                 <td class="col-notes">&nbsp;</td>
             </tr>
         @endfor
