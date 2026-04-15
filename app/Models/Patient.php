@@ -15,6 +15,7 @@ class Patient extends Model
         'id_no',
         'sex',
         'age',
+        'room',
         'ww',
         'lab',
         'burn',

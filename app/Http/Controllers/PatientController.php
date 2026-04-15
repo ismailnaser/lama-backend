@@ -49,6 +49,7 @@ class PatientController extends Controller
             'id_no' => ['required', 'string', 'max:50'],
             'sex' => ['required', 'in:M,F'],
             'age' => ['required', 'integer', 'min:0', 'max:150'],
+            'room' => ['required', 'in:room1,room2'],
             'ww' => ['sometimes', 'boolean'],
             'lab' => ['sometimes', 'boolean'],
             'burn' => ['sometimes', 'boolean'],
@@ -78,7 +79,7 @@ class PatientController extends Controller
             'action' => 'created',
             'changes' => [
                 'before' => null,
-                'after' => $patient->only(['id_no', 'sex', 'age', 'ww', 'lab', 'burn', 'notes']),
+                'after' => $patient->only(['id_no', 'sex', 'age', 'room', 'ww', 'lab', 'burn', 'notes']),
             ],
         ]);
 
@@ -89,12 +90,13 @@ class PatientController extends Controller
 
     public function update(Request $request, Patient $patient)
     {
-        $before = $patient->only(['id_no', 'sex', 'age', 'ww', 'lab', 'burn', 'notes']);
+        $before = $patient->only(['id_no', 'sex', 'age', 'room', 'ww', 'lab', 'burn', 'notes']);
 
         $data = $request->validate([
             'id_no' => ['sometimes', 'string', 'max:50'],
             'sex' => ['sometimes', 'in:M,F'],
             'age' => ['sometimes', 'integer', 'min:0', 'max:150'],
+            'room' => ['sometimes', 'in:room1,room2'],
             'ww' => ['sometimes', 'boolean'],
             'lab' => ['sometimes', 'boolean'],
             'burn' => ['sometimes', 'boolean'],
@@ -118,7 +120,7 @@ class PatientController extends Controller
 
         $patient->update($data);
 
-        $after = $patient->fresh()->only(['id_no', 'sex', 'age', 'ww', 'lab', 'burn', 'notes']);
+        $after = $patient->fresh()->only(['id_no', 'sex', 'age', 'room', 'ww', 'lab', 'burn', 'notes']);
         $u = AuthUser::fromRequest($request);
         PatientAuditLog::create([
             'patient_id' => $patient->id,
@@ -138,7 +140,7 @@ class PatientController extends Controller
 
     public function destroy(Patient $patient)
     {
-        $before = $patient->only(['id_no', 'sex', 'age', 'ww', 'lab', 'burn', 'notes']);
+        $before = $patient->only(['id_no', 'sex', 'age', 'room', 'ww', 'lab', 'burn', 'notes']);
         $u = AuthUser::fromRequest(request());
 
         PatientAuditLog::create([
@@ -185,7 +187,7 @@ class PatientController extends Controller
         $patients = Patient::query()
             ->filter($filters)
             ->oldest()
-            ->get(['id_no', 'sex', 'age', 'ww', 'lab', 'burn', 'notes', 'created_at']);
+            ->get(['id_no', 'sex', 'age', 'room', 'ww', 'lab', 'burn', 'notes', 'created_at']);
         // Safety: drop any legacy rows missing an ID so Excel doesn't show a blank first row.
         $patients = $patients
             ->filter(fn ($p) => trim((string) ($p->id_no ?? '')) !== '')
@@ -209,6 +211,7 @@ class PatientController extends Controller
             $escape('ID No'),
             $escape('Sex'),
             $escape('Age'),
+            $escape('Room'),
             $escape('WW'),
             $escape('Lab'),
             $escape('Burn'),
@@ -223,6 +226,7 @@ class PatientController extends Controller
                 $escape((string) $p->id_no),
                 $escape((string) $p->sex),
                 $escape((string) $p->age),
+                $escape((string) ($p->room ?? '')),
                 $escape($p->ww ? 'Yes' : 'No'),
                 $escape($p->lab ? 'Yes' : 'No'),
                 $escape($p->burn ? 'Yes' : 'No'),
