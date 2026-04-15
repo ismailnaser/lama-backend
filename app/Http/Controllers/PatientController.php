@@ -197,20 +197,12 @@ class PatientController extends Controller
         };
 
         $lines = [];
-        $lines[] = implode(',', [
-            $escape('ID No'),
-            $escape('Sex'),
-            $escape('Age'),
-            $escape('WW'),
-            $escape('Lab'),
-            $escape('Burn'),
-            $escape('Notes'),
-            $escape('Date'),
-            $escape('Time'),
-        ]);
+        $total = $patients->count();
 
-        foreach ($patients as $p) {
+        foreach ($patients as $idx => $p) {
+            $no = $total - $idx; // start numbering from total cases
             $lines[] = implode(',', [
+                $escape((string) $no),
                 $escape((string) $p->id_no),
                 $escape((string) $p->sex),
                 $escape((string) $p->age),
