@@ -22,7 +22,8 @@ class UserAdminController extends Controller
         $role = $this->normalizeRole((string) ($u->role ?? ''));
 
         if ($role === 'admin') {
-            return ['scope' => 'all', 'manageable' => ['admin', 'nurse', 'nurse_admin', 'doctor', 'doctor_admin']];
+            // Legacy admin accounts are treated as nursing-section admins.
+            return ['scope' => 'nurse', 'manageable' => ['admin', 'nurse', 'nurse_admin']];
         }
         if ($role === 'nurse_admin') {
             return ['scope' => 'nurse', 'manageable' => ['nurse', 'nurse_admin']];
@@ -70,13 +71,11 @@ class UserAdminController extends Controller
             ->orderBy('id', 'asc')
             ->select(['id', 'name', 'username', 'email', 'role', 'is_active', 'created_at']);
 
-        if ($ctx['scope'] !== 'all') {
-            $roles = $ctx['manageable'];
-            if ($ctx['scope'] === 'nurse') {
-                $roles[] = 'user'; // legacy nurse role
-            }
-            $query->whereIn('role', $roles);
+        $roles = $ctx['manageable'];
+        if ($ctx['scope'] === 'nurse') {
+            $roles[] = 'user'; // legacy nurse role
         }
+        $query->whereIn('role', $roles);
 
         $users = $query->get();
 
