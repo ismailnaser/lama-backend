@@ -7,6 +7,7 @@ use App\Models\PatientAuditLog;
 use App\Support\AuthUser;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Barryvdh\DomPDF\Facade\Pdf;
 
@@ -51,10 +52,21 @@ class PatientController extends Controller
         $filters = $this->validatedFilters($request);
         $section = $this->requestSection($request);
 
+        $createdBySub = PatientAuditLog::query()
+            ->select('patient_id')
+            ->selectRaw('MAX(username) as created_by')
+            ->where('action', 'created')
+            ->groupBy('patient_id');
+
         $patients = Patient::query()
-            ->where('section', $section)
+            ->leftJoinSub($createdBySub, 'created_logs', function ($join) {
+                $join->on('created_logs.patient_id', '=', 'patients.id');
+            })
+            ->where('patients.section', $section)
             ->filter($filters)
-            ->latest()
+            ->select('patients.*')
+            ->addSelect(DB::raw("COALESCE(created_logs.created_by, '') as created_by"))
+            ->latest('patients.created_at')
             ->get();
 
         return response()->json([
