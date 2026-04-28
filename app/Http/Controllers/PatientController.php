@@ -12,8 +12,24 @@ use Barryvdh\DomPDF\Facade\Pdf;
 
 class PatientController extends Controller
 {
+    private function requestSection(Request $request): string
+    {
+        $u = AuthUser::fromRequest($request);
+        $role = (string) ($u?->role ?? 'user');
+        return in_array($role, ['doctor', 'doctor_admin'], true) ? 'doctor' : 'nurse';
+    }
+
+    private function isInSection(Request $request, Patient $patient): bool
+    {
+        return (string) ($patient->section ?? 'nurse') === $this->requestSection($request);
+    }
+
     public function audits(Request $request, Patient $patient)
     {
+        if (!$this->isInSection($request, $patient)) {
+            return response()->json(['message' => 'Not found.'], 404);
+        }
+
         $logs = PatientAuditLog::query()
             ->where('patient_id', $patient->id)
             ->latest()
@@ -24,16 +40,19 @@ class PatientController extends Controller
 
     public function count()
     {
+        $section = $this->requestSection(request());
         return response()->json([
-            'count' => Patient::query()->count(),
+            'count' => Patient::query()->where('section', $section)->count(),
         ]);
     }
 
-    public function index()
+    public function index(Request $request)
     {
-        $filters = $this->validatedFilters(request());
+        $filters = $this->validatedFilters($request);
+        $section = $this->requestSection($request);
 
         $patients = Patient::query()
+            ->where('section', $section)
             ->filter($filters)
             ->latest()
             ->get();
@@ -57,8 +76,11 @@ class PatientController extends Controller
         ]);
 
         $data['id_no'] = trim($data['id_no']);
+        $section = $this->requestSection($request);
+        $data['section'] = $section;
 
         $duplicateToday = Patient::query()
+            ->where('section', $section)
             ->where('id_no', $data['id_no'])
             ->whereDate('created_at', CarbonImmutable::now())
             ->exists();
@@ -90,6 +112,10 @@ class PatientController extends Controller
 
     public function update(Request $request, Patient $patient)
     {
+        if (!$this->isInSection($request, $patient)) {
+            return response()->json(['message' => 'Not found.'], 404);
+        }
+
         $before = $patient->only(['id_no', 'sex', 'age', 'room', 'ww', 'lab', 'burn', 'notes']);
 
         $data = $request->validate([
@@ -107,6 +133,7 @@ class PatientController extends Controller
             $data['id_no'] = trim($data['id_no']);
             $day = CarbonImmutable::parse($patient->created_at)->toDateString();
             $conflict = Patient::query()
+                ->where('section', (string) ($patient->section ?? 'nurse'))
                 ->where('id_no', $data['id_no'])
                 ->whereDate('created_at', $day)
                 ->where('id', '!=', $patient->id)
@@ -140,6 +167,10 @@ class PatientController extends Controller
 
     public function destroy(Patient $patient)
     {
+        if (!$this->isInSection(request(), $patient)) {
+            return response()->json(['message' => 'Not found.'], 404);
+        }
+
         $before = $patient->only(['id_no', 'sex', 'age', 'room', 'ww', 'lab', 'burn', 'notes']);
         $u = AuthUser::fromRequest(request());
 
@@ -162,8 +193,10 @@ class PatientController extends Controller
     public function pdf(Request $request)
     {
         $filters = $this->validatedFilters($request);
+        $section = $this->requestSection($request);
 
         $patients = Patient::query()
+            ->where('section', $section)
             ->filter($filters)
             ->oldest()
             ->get();
@@ -183,8 +216,10 @@ class PatientController extends Controller
     public function excel(Request $request)
     {
         $filters = $this->validatedFilters($request);
+        $section = $this->requestSection($request);
 
         $patients = Patient::query()
+            ->where('section', $section)
             ->filter($filters)
             ->oldest()
             ->get(['id_no', 'sex', 'age', 'room', 'ww', 'lab', 'burn', 'notes', 'created_at']);
