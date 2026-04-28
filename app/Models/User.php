@@ -13,7 +13,7 @@ class User extends Authenticatable
 
     public function isAdmin(): bool
     {
-        return ($this->role ?? 'user') === 'admin';
+        return in_array(($this->role ?? 'user'), ['admin', 'doctor_admin', 'nurse_admin'], true);
     }
 
     /**

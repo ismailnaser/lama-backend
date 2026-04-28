@@ -9,6 +9,45 @@ use Illuminate\Support\Facades\Validator;
 
 class UserAdminController extends Controller
 {
+    private function normalizeRole(string $role): string
+    {
+        $r = strtolower(trim($role));
+        if ($r === 'user') return 'nurse';
+        return $r;
+    }
+
+    private function actorContext(Request $request): array
+    {
+        $u = $request->attributes->get('auth_user');
+        $role = $this->normalizeRole((string) ($u->role ?? ''));
+
+        if ($role === 'admin') {
+            return ['scope' => 'all', 'manageable' => ['admin', 'nurse', 'nurse_admin', 'doctor', 'doctor_admin']];
+        }
+        if ($role === 'nurse_admin') {
+            return ['scope' => 'nurse', 'manageable' => ['nurse', 'nurse_admin']];
+        }
+        if ($role === 'doctor_admin') {
+            return ['scope' => 'doctor', 'manageable' => ['doctor', 'doctor_admin']];
+        }
+
+        return ['scope' => 'none', 'manageable' => []];
+    }
+
+    private function activeAdminsByRole(string $role): int
+    {
+        return (int) DB::table('users')
+            ->where('role', $role)
+            ->where('is_active', true)
+            ->count();
+    }
+
+    private function canManageRole(Request $request, string $targetRole): bool
+    {
+        $ctx = $this->actorContext($request);
+        return in_array($targetRole, $ctx['manageable'], true);
+    }
+
     private function actingAdminId(Request $request): int
     {
         $u = $request->attributes->get('auth_user');
@@ -20,16 +59,26 @@ class UserAdminController extends Controller
         DB::table('api_tokens')->where('user_id', $userId)->delete();
     }
 
-    private function activeAdminCount(): int
+    public function index(Request $request)
     {
-        return (int) DB::table('users')->where('role', 'admin')->where('is_active', true)->count();
-    }
+        $ctx = $this->actorContext($request);
+        if ($ctx['scope'] === 'none') {
+            return response()->json(['message' => 'Forbidden.'], 403);
+        }
 
-    public function index()
-    {
-        $users = DB::table('users')
+        $query = DB::table('users')
             ->orderBy('id', 'asc')
-            ->get(['id', 'name', 'username', 'email', 'role', 'is_active', 'created_at']);
+            ->select(['id', 'name', 'username', 'email', 'role', 'is_active', 'created_at']);
+
+        if ($ctx['scope'] !== 'all') {
+            $roles = $ctx['manageable'];
+            if ($ctx['scope'] === 'nurse') {
+                $roles[] = 'user'; // legacy nurse role
+            }
+            $query->whereIn('role', $roles);
+        }
+
+        $users = $query->get();
 
         return response()->json(['data' => $users]);
     }
@@ -40,9 +89,13 @@ class UserAdminController extends Controller
             'name' => ['required', 'string', 'max:255'],
             'username' => ['required', 'string', 'max:50'],
             'password' => ['required', 'string', 'min:6', 'max:255'],
-            'role' => ['required', 'in:user,admin'],
+            'role' => ['required', 'in:user,admin,nurse,nurse_admin,doctor,doctor_admin'],
             'email' => ['nullable', 'email', 'max:255'],
         ])->validate();
+        $data['role'] = $this->normalizeRole((string) $data['role']);
+        if (!$this->canManageRole($request, (string) $data['role'])) {
+            return response()->json(['message' => 'You can only create users in your section.'], 403);
+        }
 
         $username = trim($data['username']);
 
@@ -78,15 +131,25 @@ class UserAdminController extends Controller
         if (!$target) {
             return response()->json(['message' => 'User not found.'], 404);
         }
+        $targetRole = $this->normalizeRole((string) $target->role);
+        if (!$this->canManageRole($request, $targetRole)) {
+            return response()->json(['message' => 'You can only manage users in your section.'], 403);
+        }
 
         $data = Validator::make($request->all(), [
             'name' => ['sometimes', 'string', 'max:255'],
             'username' => ['sometimes', 'string', 'max:50'],
             'password' => ['sometimes', 'string', 'min:6', 'max:255'],
-            'role' => ['sometimes', 'in:user,admin'],
+            'role' => ['sometimes', 'in:user,admin,nurse,nurse_admin,doctor,doctor_admin'],
             'email' => ['nullable', 'email', 'max:255'],
             'is_active' => ['sometimes', 'boolean'],
         ])->validate();
+        if (array_key_exists('role', $data)) {
+            $data['role'] = $this->normalizeRole((string) $data['role']);
+            if (!$this->canManageRole($request, (string) $data['role'])) {
+                return response()->json(['message' => 'You can only assign roles in your section.'], 403);
+            }
+        }
 
         if (array_key_exists('username', $data)) {
             $newUsername = trim((string) $data['username']);
@@ -111,14 +174,14 @@ class UserAdminController extends Controller
         }
 
         if (array_key_exists('is_active', $updates) && $updates['is_active'] === false) {
-            if ((string) $target->role === 'admin' && $this->activeAdminCount() <= 1) {
-                return response()->json(['message' => 'Cannot disable the last active admin.'], 422);
+            if (in_array($targetRole, ['admin', 'nurse_admin', 'doctor_admin'], true) && $this->activeAdminsByRole($targetRole) <= 1) {
+                return response()->json(['message' => 'Cannot disable the last active admin in this section.'], 422);
             }
         }
 
-        if (array_key_exists('role', $updates) && $updates['role'] === 'user') {
-            if ((string) $target->role === 'admin' && $this->activeAdminCount() <= 1) {
-                return response()->json(['message' => 'Cannot demote the last active admin.'], 422);
+        if (array_key_exists('role', $updates) && in_array($targetRole, ['admin', 'nurse_admin', 'doctor_admin'], true)) {
+            if ($updates['role'] !== $targetRole && $this->activeAdminsByRole($targetRole) <= 1) {
+                return response()->json(['message' => 'Cannot demote the last active admin in this section.'], 422);
             }
         }
 
@@ -155,9 +218,13 @@ class UserAdminController extends Controller
         if (!$target) {
             return response()->json(['message' => 'User not found.'], 404);
         }
+        $targetRole = $this->normalizeRole((string) $target->role);
+        if (!$this->canManageRole($request, $targetRole)) {
+            return response()->json(['message' => 'You can only manage users in your section.'], 403);
+        }
 
-        if ((string) $target->role === 'admin' && $this->activeAdminCount() <= 1) {
-            return response()->json(['message' => 'Cannot delete the last active admin.'], 422);
+        if (in_array($targetRole, ['admin', 'nurse_admin', 'doctor_admin'], true) && $this->activeAdminsByRole($targetRole) <= 1) {
+            return response()->json(['message' => 'Cannot delete the last active admin in this section.'], 422);
         }
 
         $this->revokeAllTokensForUser($user);

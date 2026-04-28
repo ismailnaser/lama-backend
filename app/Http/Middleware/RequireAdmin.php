@@ -14,7 +14,9 @@ class RequireAdmin
     public function handle(Request $request, Closure $next): Response
     {
         $u = $request->attributes->get('auth_user');
-        if (!$u || (($u->role ?? 'user') !== 'admin')) {
+        $role = (string) ($u->role ?? 'user');
+        $isScopedAdmin = in_array($role, ['admin', 'doctor_admin', 'nurse_admin'], true);
+        if (!$u || !$isScopedAdmin) {
             return response()->json(['message' => 'Forbidden.'], 403);
         }
 
