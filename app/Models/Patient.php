@@ -16,6 +16,7 @@ class Patient extends Model
         'sex',
         'age',
         'section',
+        'client_request_id',
         'room',
         'ww',
         'lab',

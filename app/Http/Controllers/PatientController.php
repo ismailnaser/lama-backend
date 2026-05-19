@@ -85,23 +85,55 @@ class PatientController extends Controller
             'lab' => ['sometimes', 'boolean'],
             'burn' => ['sometimes', 'boolean'],
             'notes' => ['nullable', 'string', 'max:5000'],
+            'client_request_id' => ['nullable', 'string', 'max:64'],
+            'recorded_at' => ['nullable', 'date'],
         ]);
 
         $data['id_no'] = trim($data['id_no']);
         $section = $this->requestSection($request);
         $data['section'] = $section;
 
-        $duplicateToday = Patient::query()
+        $clientRequestId = isset($data['client_request_id'])
+            ? trim((string) $data['client_request_id'])
+            : null;
+        if ($clientRequestId === '') {
+            $clientRequestId = null;
+        }
+        unset($data['client_request_id']);
+
+        $recordedAt = isset($data['recorded_at'])
+            ? CarbonImmutable::parse($data['recorded_at'])
+            : CarbonImmutable::now();
+        unset($data['recorded_at']);
+
+        if ($clientRequestId !== null) {
+            $existingByRequest = Patient::query()
+                ->where('section', $section)
+                ->where('client_request_id', $clientRequestId)
+                ->first();
+            if ($existingByRequest) {
+                return response()->json([
+                    'data' => $existingByRequest,
+                ]);
+            }
+        }
+
+        $duplicateOnRecordDay = Patient::query()
             ->where('section', $section)
             ->where('id_no', $data['id_no'])
-            ->whereDate('created_at', CarbonImmutable::now())
-            ->exists();
+            ->whereDate('created_at', $recordedAt)
+            ->first();
 
-        if ($duplicateToday) {
+        if ($duplicateOnRecordDay) {
             return response()->json([
                 'message' => 'This ID number is already registered today.',
+                'data' => $duplicateOnRecordDay,
             ], 409);
         }
+
+        $data['client_request_id'] = $clientRequestId;
+        $data['created_at'] = $recordedAt;
+        $data['updated_at'] = $recordedAt;
 
         $patient = Patient::create($data);
 
