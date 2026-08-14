@@ -126,16 +126,18 @@ class PatientController extends Controller
 
         if ($duplicateOnRecordDay) {
             return response()->json([
-                'message' => 'This ID number is already registered today.',
+                'message' => 'This ID number is already registered on this date.',
                 'data' => $duplicateOnRecordDay,
             ], 409);
         }
 
         $data['client_request_id'] = $clientRequestId;
-        $data['created_at'] = $recordedAt;
-        $data['updated_at'] = $recordedAt;
 
-        $patient = Patient::create($data);
+        $patient = new Patient();
+        $patient->fill($data);
+        $patient->created_at = $recordedAt;
+        $patient->updated_at = $recordedAt;
+        $patient->save();
 
         $u = AuthUser::fromRequest($request);
         PatientAuditLog::create([
