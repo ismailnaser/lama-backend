@@ -3,6 +3,7 @@
 use App\Http\Controllers\PatientController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\UserAdminController;
+use App\Http\Controllers\ScanLogSheetController;
 use Illuminate\Support\Facades\Route;
 
 Route::post('/auth/login', [AuthController::class, 'login']);
@@ -18,6 +19,7 @@ Route::middleware('auth.token')->group(function () {
     Route::delete('/patients/{patient}', [PatientController::class, 'destroy']);
     Route::get('/patients/pdf', [PatientController::class, 'pdf']);
     Route::get('/patients/excel', [PatientController::class, 'excel']);
+    Route::post('/scan-log-sheet', [ScanLogSheetController::class, 'store']);
 
     Route::middleware('admin')->group(function () {
         Route::get('/patients/{patient}/audits', [PatientController::class, 'audits']);

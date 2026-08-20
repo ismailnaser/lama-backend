@@ -14,6 +14,7 @@ class AuthController extends Controller
         $data = Validator::make($request->all(), [
             'username' => ['required', 'string', 'max:50'],
             'password' => ['required', 'string', 'max:255'],
+            'remember_me' => ['sometimes', 'boolean'],
         ])->validate();
 
         $username = trim($data['username']);
@@ -33,12 +34,14 @@ class AuthController extends Controller
 
         $plain = rtrim(strtr(base64_encode(random_bytes(32)), '+/', '-_'), '=');
         $hash = hash('sha256', $plain);
+        $remember = $request->boolean('remember_me');
 
         DB::table('api_tokens')->insert([
             'user_id' => $user->id,
-            'name' => 'web',
+            'name' => $remember ? 'web_remember' : 'web',
             'token_hash' => $hash,
             'last_used_at' => now(),
+            'expires_at' => $remember ? now()->addDays(30) : now()->addHours(12),
             'created_at' => now(),
             'updated_at' => now(),
         ]);

@@ -31,4 +31,18 @@ return [
         ],
     ],
 
+    'vision' => [
+        // gemini | openai | auto (gemini key first, then openai)
+        'provider' => env('VISION_PROVIDER', 'auto'),
+        'gemini' => [
+            'key' => env('GEMINI_API_KEY'),
+            'model' => env('GEMINI_MODEL', 'gemini-3.6-flash'),
+        ],
+        'openai' => [
+            'key' => env('OPENAI_API_KEY'),
+            'model' => env('OPENAI_MODEL', 'gpt-4o'),
+            'base_url' => env('OPENAI_BASE_URL', 'https://api.openai.com/v1'),
+        ],
+    ],
+
 ];
