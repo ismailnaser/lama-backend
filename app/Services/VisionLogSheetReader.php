@@ -11,7 +11,7 @@ class VisionLogSheetReader
     {
         $bytes = file_get_contents($absolutePath);
         if ($bytes === false || $bytes === '') {
-            throw new RuntimeException('Could not read the uploaded image.');
+            throw new RuntimeException('Could not read this photo. Try another image.');
         }
 
         $base64 = base64_encode($bytes);
@@ -33,13 +33,13 @@ class VisionLogSheetReader
 
         if ($requested === 'gemini') {
             if ($geminiKey === '') {
-                throw new RuntimeException('Set GEMINI_API_KEY in the backend .env file.');
+                throw new RuntimeException('The scan service is not available right now. Try again later.');
             }
             return 'gemini';
         }
         if ($requested === 'openai') {
             if ($openaiKey === '') {
-                throw new RuntimeException('Set OPENAI_API_KEY in the backend .env file.');
+                throw new RuntimeException('The scan service is not available right now. Try again later.');
             }
             return 'openai';
         }
@@ -50,9 +50,7 @@ class VisionLogSheetReader
             return 'openai';
         }
 
-        throw new RuntimeException(
-            'Add GEMINI_API_KEY (free from Google AI Studio) or OPENAI_API_KEY to the backend .env, then restart php artisan serve.'
-        );
+        throw new RuntimeException('The scan service is not available right now. Try again later.');
     }
 
     private function prompt(): string
@@ -126,17 +124,17 @@ PROMPT;
             $unavailable = $res->status() === 404
                 && str_contains((string) $res->body(), 'no longer available');
             if (!$unavailable) {
-                throw new RuntimeException($this->httpError('Gemini', $res->status(), $res->body()));
+                throw new RuntimeException($this->httpError($res->status(), $res->body()));
             }
         }
 
         if ($res === null || !$res->successful()) {
-            throw new RuntimeException($this->httpError('Gemini', $res?->status() ?? 0, $res?->body() ?? ''));
+            throw new RuntimeException($this->httpError($res?->status() ?? 0, $res?->body() ?? ''));
         }
 
         $text = data_get($res->json(), 'candidates.0.content.parts.0.text');
         if (!is_string($text) || trim($text) === '') {
-            throw new RuntimeException('Gemini returned an empty reading.');
+            throw new RuntimeException('Could not read the sheet from this photo. Try a clearer photo.');
         }
 
         return $text;
@@ -166,12 +164,12 @@ PROMPT;
             ]);
 
         if (!$res->successful()) {
-            throw new RuntimeException($this->httpError('OpenAI', $res->status(), $res->body()));
+            throw new RuntimeException($this->httpError($res->status(), $res->body()));
         }
 
         $text = data_get($res->json(), 'choices.0.message.content');
         if (!is_string($text) || trim($text) === '') {
-            throw new RuntimeException('OpenAI returned an empty reading.');
+            throw new RuntimeException('Could not read the sheet from this photo. Try a clearer photo.');
         }
 
         return $text;
@@ -190,7 +188,7 @@ PROMPT;
         }
         $json = json_decode($t, true);
         if (!is_array($json)) {
-            throw new RuntimeException('AI did not return valid JSON.');
+            throw new RuntimeException('Could not read the sheet from this photo. Try a clearer photo.');
         }
 
         return $json;
@@ -289,16 +287,32 @@ PROMPT;
         };
     }
 
-    private function httpError(string $who, int $status, string $body): string
+    private function httpError(int $status, string $body): string
     {
-        $snippet = trim(mb_substr($body, 0, 180));
-        if ($status === 401 || $status === 403) {
-            return $who.' API key was rejected. Check the key in .env.';
+        $decoded = json_decode($body, true);
+        $apiMessage = is_array($decoded) ? strtolower((string) data_get($decoded, 'error.message', '')) : '';
+        $apiStatus = is_array($decoded) ? (string) data_get($decoded, 'error.status', '') : '';
+
+        if (
+            $status === 401
+            || $status === 403
+            || $apiStatus === 'UNAUTHENTICATED'
+            || str_contains($apiMessage, 'api key')
+        ) {
+            return 'The scan service is not available right now. Try again later.';
         }
-        if ($status === 429) {
-            return $who.' rate limit. Try again in a moment.';
+        if (
+            $status === 429
+            || $apiStatus === 'RESOURCE_EXHAUSTED'
+            || str_contains($apiMessage, 'quota')
+            || str_contains($apiMessage, 'rate')
+        ) {
+            return 'The scan service is busy. Wait a moment and try again.';
+        }
+        if ($status >= 500) {
+            return 'The scan service failed. Try again in a moment.';
         }
 
-        return $who.' request failed ('.$status.')'.($snippet !== '' ? ': '.$snippet : '');
+        return 'Could not analyze this photo. Try a clearer photo of the sheet.';
     }
 }

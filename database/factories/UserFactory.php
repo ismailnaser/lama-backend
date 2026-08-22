@@ -11,34 +11,54 @@ use Illuminate\Support\Str;
  */
 class UserFactory extends Factory
 {
-    /**
-     * The current password being used by the factory.
-     */
     protected static ?string $password;
 
-    /**
-     * Define the model's default state.
-     *
-     * @return array<string, mixed>
-     */
     public function definition(): array
     {
         return [
             'name' => fake()->name(),
+            'username' => fake()->unique()->numerify('user#######'),
             'email' => fake()->unique()->safeEmail(),
             'email_verified_at' => now(),
             'password' => static::$password ??= Hash::make('password'),
+            'role' => 'nurse',
+            'is_active' => true,
             'remember_token' => Str::random(10),
         ];
     }
 
-    /**
-     * Indicate that the model's email address should be unverified.
-     */
+    public function nurse(): static
+    {
+        return $this->state(fn () => ['role' => 'nurse']);
+    }
+
+    public function nurseAdmin(): static
+    {
+        return $this->state(fn () => ['role' => 'nurse_admin']);
+    }
+
+    public function doctor(): static
+    {
+        return $this->state(fn () => ['role' => 'doctor']);
+    }
+
+    public function doctorAdmin(): static
+    {
+        return $this->state(fn () => ['role' => 'doctor_admin']);
+    }
+
+    public function admin(): static
+    {
+        return $this->state(fn () => ['role' => 'admin']);
+    }
+
+    public function disabled(): static
+    {
+        return $this->state(fn () => ['is_active' => false]);
+    }
+
     public function unverified(): static
     {
-        return $this->state(fn (array $attributes) => [
-            'email_verified_at' => null,
-        ]);
+        return $this->state(fn () => ['email_verified_at' => null]);
     }
 }

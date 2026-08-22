@@ -28,7 +28,7 @@ class ScanLogSheetController extends Controller
             report($e);
 
             return response()->json([
-                'message' => 'Failed to read the sheet. Try a clearer photo.',
+                'message' => 'Could not analyze this photo. Try a clearer photo of the sheet.',
             ], 500);
         }
 

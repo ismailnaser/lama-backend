@@ -51,14 +51,13 @@ class Patient extends Model
         $hasAnyFilter = $hasId || $hasIdExact || $hasDateFilter;
 
         if ($from && $to) {
-            $start = CarbonImmutable::parse($from)->startOfDay();
-            $end = CarbonImmutable::parse($to)->endOfDay();
+            [$start, $end] = self::dayBounds($from, $to);
             return $query->whereBetween('created_at', [$start, $end]);
         }
 
         if ($date) {
-            $day = CarbonImmutable::parse($date);
-            return $query->whereDate('created_at', $day);
+            [$start, $end] = self::dayBounds($date);
+            return $query->whereBetween('created_at', [$start, $end]);
         }
 
         // If searching by ID without a date filter, do NOT constrain by date.
@@ -71,6 +70,25 @@ class Patient extends Model
             return $query;
         }
 
-        return $query->whereDate('created_at', CarbonImmutable::today());
+        [$start, $end] = self::dayBounds(CarbonImmutable::today());
+        return $query->whereBetween('created_at', [$start, $end]);
+    }
+
+    /**
+     * Inclusive calendar-day bounds that keep created_at filters index-friendly.
+     *
+     * @return array{0: CarbonImmutable, 1: CarbonImmutable}
+     */
+    public static function dayBounds(mixed $from, mixed $to = null): array
+    {
+        $start = $from instanceof CarbonImmutable
+            ? $from->startOfDay()
+            : CarbonImmutable::parse($from)->startOfDay();
+        $endSource = $to ?? $from;
+        $end = $endSource instanceof CarbonImmutable
+            ? $endSource->endOfDay()
+            : CarbonImmutable::parse($endSource)->endOfDay();
+
+        return [$start, $end];
     }
 }

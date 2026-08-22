@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use Carbon\Carbon;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -34,6 +35,7 @@ class ApiTokenAuth
             ->select([
                 'api_tokens.id as token_id',
                 'api_tokens.expires_at',
+                'api_tokens.last_used_at',
                 'users.id as user_id',
                 'users.name',
                 'users.username',
@@ -68,7 +70,10 @@ class ApiTokenAuth
         ]);
         $request->attributes->set('auth_token_id', (int) $row->token_id);
 
-        DB::table('api_tokens')->where('id', $row->token_id)->update(['last_used_at' => now()]);
+        $lastUsed = $row->last_used_at ? Carbon::parse($row->last_used_at) : null;
+        if ($lastUsed === null || $lastUsed->diffInSeconds(now()) >= 300) {
+            DB::table('api_tokens')->where('id', $row->token_id)->update(['last_used_at' => now()]);
+        }
 
         return $next($request);
     }

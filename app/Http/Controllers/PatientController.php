@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Patient;
 use App\Models\PatientAuditLog;
 use App\Support\AuthUser;
+use App\Support\PatientSectionCache;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -43,7 +44,10 @@ class PatientController extends Controller
     {
         $section = $this->requestSection(request());
         return response()->json([
-            'count' => Patient::query()->where('section', $section)->count(),
+            'count' => PatientSectionCache::count(
+                $section,
+                fn () => Patient::query()->where('section', $section)->count()
+            ),
         ]);
     }
 
@@ -118,10 +122,11 @@ class PatientController extends Controller
             }
         }
 
+        [$dayStart, $dayEnd] = Patient::dayBounds($recordedAt);
         $duplicateOnRecordDay = Patient::query()
             ->where('section', $section)
             ->where('id_no', $data['id_no'])
-            ->whereDate('created_at', $recordedAt)
+            ->whereBetween('created_at', [$dayStart, $dayEnd])
             ->first();
 
         if ($duplicateOnRecordDay) {
@@ -138,6 +143,7 @@ class PatientController extends Controller
         $patient->created_at = $recordedAt;
         $patient->updated_at = $recordedAt;
         $patient->save();
+        PatientSectionCache::forget($section);
 
         $u = AuthUser::fromRequest($request);
         PatientAuditLog::create([
@@ -177,11 +183,11 @@ class PatientController extends Controller
 
         if (array_key_exists('id_no', $data)) {
             $data['id_no'] = trim($data['id_no']);
-            $day = CarbonImmutable::parse($patient->created_at)->toDateString();
+            [$dayStart, $dayEnd] = Patient::dayBounds($patient->created_at);
             $conflict = Patient::query()
                 ->where('section', (string) ($patient->section ?? 'nurse'))
                 ->where('id_no', $data['id_no'])
-                ->whereDate('created_at', $day)
+                ->whereBetween('created_at', [$dayStart, $dayEnd])
                 ->where('id', '!=', $patient->id)
                 ->exists();
             if ($conflict) {
@@ -231,7 +237,9 @@ class PatientController extends Controller
             ],
         ]);
 
+        $section = (string) ($patient->section ?? 'nurse');
         $patient->delete();
+        PatientSectionCache::forget($section);
 
         return response()->noContent();
     }

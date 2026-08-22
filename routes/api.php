@@ -6,7 +6,7 @@ use App\Http\Controllers\UserAdminController;
 use App\Http\Controllers\ScanLogSheetController;
 use Illuminate\Support\Facades\Route;
 
-Route::post('/auth/login', [AuthController::class, 'login']);
+Route::post('/auth/login', [AuthController::class, 'login'])->middleware('throttle:login');
 
 Route::middleware('auth.token')->group(function () {
     Route::get('/auth/me', [AuthController::class, 'me']);
@@ -19,7 +19,7 @@ Route::middleware('auth.token')->group(function () {
     Route::delete('/patients/{patient}', [PatientController::class, 'destroy']);
     Route::get('/patients/pdf', [PatientController::class, 'pdf']);
     Route::get('/patients/excel', [PatientController::class, 'excel']);
-    Route::post('/scan-log-sheet', [ScanLogSheetController::class, 'store']);
+    Route::post('/scan-log-sheet', [ScanLogSheetController::class, 'store'])->middleware('throttle:scan');
 
     Route::middleware('admin')->group(function () {
         Route::get('/patients/{patient}/audits', [PatientController::class, 'audits']);

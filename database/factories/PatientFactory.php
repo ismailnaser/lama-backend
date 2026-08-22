@@ -14,17 +14,26 @@ class PatientFactory extends Factory
 
     public function definition(): array
     {
-        $createdAt = $this->faker->dateTimeBetween('-90 days', 'now');
+        $createdAt = now();
 
         return [
-            'id_no' => (string) $this->faker->numberBetween(100, 999999),
-            'sex' => $this->faker->randomElement(['M', 'F']),
-            'age' => $this->faker->numberBetween(1, 95),
-            'ww' => $this->faker->boolean(25),
-            'notes' => $this->faker->boolean(40) ? $this->faker->sentence(4) : null,
+            'id_no' => (string) fake()->unique()->numberBetween(100, 999999),
+            'sex' => fake()->randomElement(['M', 'F']),
+            'age' => fake()->numberBetween(0, 95),
+            'section' => 'nurse',
+            'room' => fake()->randomElement(['room1', 'room2']),
+            'ww' => false,
+            'lab' => false,
+            'burn' => false,
+            'notes' => null,
             'created_at' => $createdAt,
             'updated_at' => $createdAt,
         ];
+    }
+
+    public function doctor(): static
+    {
+        return $this->state(fn () => ['section' => 'doctor']);
     }
 
     public function today(): static
@@ -36,4 +45,3 @@ class PatientFactory extends Factory
         ]);
     }
 }
-

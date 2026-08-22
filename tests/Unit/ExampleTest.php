@@ -2,14 +2,11 @@
 
 namespace Tests\Unit;
 
-use PHPUnit\Framework\TestCase;
+use Tests\TestCase;
 
 class ExampleTest extends TestCase
 {
-    /**
-     * A basic test example.
-     */
-    public function test_that_true_is_true(): void
+    public function test_placeholder_removed_in_favor_of_domain_tests(): void
     {
         $this->assertTrue(true);
     }
