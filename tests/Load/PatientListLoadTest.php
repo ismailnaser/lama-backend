@@ -6,6 +6,7 @@ use App\Models\Patient;
 use App\Support\PatientSectionCache;
 use Illuminate\Support\Benchmark;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 class PatientListLoadTest extends TestCase
@@ -48,17 +49,13 @@ class PatientListLoadTest extends TestCase
                 ->assertJsonCount(1000, 'data');
         });
 
+        // Wall-clock timings are noise at sub-millisecond scale, so the cache is
+        // proven by counting the aggregate queries it removes instead.
         Cache::flush();
-        $countColdMs = Benchmark::measure(function () use ($token) {
-            $this->apiGet('/api/patients/count', $token)
-                ->assertOk()
-                ->assertJsonPath('count', 1000);
-        });
-        $countCachedMs = Benchmark::measure(function () use ($token) {
-            $this->apiGet('/api/patients/count', $token)
-                ->assertOk()
-                ->assertJsonPath('count', 1000);
-        });
+        $countCold = $this->measureCountRequest($token);
+        $countCached = $this->measureCountRequest($token);
+        $countColdMs = $countCold['ms'];
+        $countCachedMs = $countCached['ms'];
 
         $createMs = Benchmark::measure(function () use ($token) {
             $this->apiPost('/api/patients', $this->patientPayload([
@@ -79,6 +76,8 @@ class PatientListLoadTest extends TestCase
             'list_all_ms' => round($listAllMs, 2),
             'count_cold_ms' => round($countColdMs, 2),
             'count_cached_ms' => round($countCachedMs, 2),
+            'count_cold_aggregate_queries' => $countCold['aggregates'],
+            'count_cached_aggregate_queries' => $countCached['aggregates'],
             'create_ms' => round($createMs, 2),
             'auth_me_x20_ms' => round($authRepeatMs, 2),
             'auth_me_avg_ms' => round($authRepeatMs / 20, 2),
@@ -94,8 +93,34 @@ class PatientListLoadTest extends TestCase
 
         $this->assertLessThan(1500, $listTodayMs, 'Today list should stay interactive with indexes');
         $this->assertLessThan(2500, $listAllMs, 'Unfiltered list of 1000 rows should stay under 2.5s in sqlite');
-        $this->assertLessThanOrEqual($countColdMs, $countCachedMs + 0.01);
+        $this->assertSame(1, $countCold['aggregates'], 'Cold count must hit the database once');
+        $this->assertSame(0, $countCached['aggregates'], 'Cached count must not query the database');
         $this->assertLessThan(800, $createMs);
         $this->assertFileExists($dir.'/load-test-results.json');
+    }
+
+    /**
+     * @return array{ms: float, aggregates: int}
+     */
+    private function measureCountRequest(string $token): array
+    {
+        $aggregates = 0;
+        DB::listen(function ($query) use (&$aggregates) {
+            if (str_contains(strtolower($query->sql), 'count(*)')) {
+                $aggregates++;
+            }
+        });
+
+        $ms = Benchmark::measure(function () use ($token) {
+            $this->apiGet('/api/patients/count', $token)
+                ->assertOk()
+                ->assertJsonPath('count', 1000);
+        });
+
+        // Drop the listener so the next measurement starts clean.
+        DB::connection()->flushQueryLog();
+        app('events')->forget('Illuminate\Database\Events\QueryExecuted');
+
+        return ['ms' => $ms, 'aggregates' => $aggregates];
     }
 }

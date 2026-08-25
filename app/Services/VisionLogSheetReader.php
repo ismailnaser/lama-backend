@@ -116,8 +116,13 @@ PROMPT;
 
         $res = null;
         foreach ($models as $model) {
-            $url = 'https://generativelanguage.googleapis.com/v1beta/models/'.$model.':generateContent?key='.urlencode($key);
-            $res = Http::timeout(150)->connectTimeout(15)->post($url, $payload);
+            // The key goes in the x-goog-api-key header: newer Gemini keys are
+            // rejected with 401 when passed as a ?key= query parameter.
+            $url = 'https://generativelanguage.googleapis.com/v1beta/models/'.$model.':generateContent';
+            $res = Http::timeout(150)
+                ->connectTimeout(15)
+                ->withHeaders(['x-goog-api-key' => $key])
+                ->post($url, $payload);
             if ($res->successful()) {
                 break;
             }
