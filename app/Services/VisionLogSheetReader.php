@@ -2,11 +2,19 @@
 
 namespace App\Services;
 
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
 use RuntimeException;
 
 class VisionLogSheetReader
 {
+    /** The browser aborts a scan at 165s; stay well inside that for all attempts combined. */
+    private const GEMINI_BUDGET_SECONDS = 130;
+
+    private const GEMINI_ATTEMPT_SECONDS = 75;
+
+    private const GEMINI_MIN_ATTEMPT_SECONDS = 20;
+
     public function read(string $absolutePath, string $mime): array
     {
         $bytes = file_get_contents($absolutePath);
@@ -92,9 +100,14 @@ PROMPT;
     {
         $key = trim((string) config('services.vision.gemini.key'));
         $preferred = trim((string) config('services.vision.gemini.model', 'gemini-3.6-flash'));
+        // Ordered by observed answer speed: the lite models reply in seconds and
+        // carry their own daily free-tier quota, so they stay usable after the
+        // main model is spent. gemini-flash-latest is last, it often stalls.
         $models = array_values(array_unique(array_filter([
             $preferred,
             'gemini-3.6-flash',
+            'gemini-3.1-flash-lite',
+            'gemini-flash-lite-latest',
             'gemini-flash-latest',
         ])));
 
@@ -114,27 +127,50 @@ PROMPT;
             ],
         ];
 
+        // The whole chain has to answer before the browser gives up, so the
+        // fallbacks share one budget instead of each getting a full timeout.
+        $deadline = microtime(true) + self::GEMINI_BUDGET_SECONDS;
         $res = null;
+        $lastError = null;
+
         foreach ($models as $model) {
+            $remaining = (int) floor($deadline - microtime(true));
+            if ($remaining < self::GEMINI_MIN_ATTEMPT_SECONDS) {
+                break;
+            }
+
             // The key goes in the x-goog-api-key header: newer Gemini keys are
             // rejected with 401 when passed as a ?key= query parameter.
             $url = 'https://generativelanguage.googleapis.com/v1beta/models/'.$model.':generateContent';
-            $res = Http::timeout(150)
-                ->connectTimeout(15)
-                ->withHeaders(['x-goog-api-key' => $key])
-                ->post($url, $payload);
+
+            try {
+                $res = Http::timeout(min(self::GEMINI_ATTEMPT_SECONDS, $remaining))
+                    ->connectTimeout(15)
+                    ->withHeaders(['x-goog-api-key' => $key])
+                    ->post($url, $payload);
+            } catch (ConnectionException) {
+                $res = null;
+                $lastError = 'The scan service took too long to answer. Try again in a moment.';
+                continue;
+            }
+
             if ($res->successful()) {
                 break;
             }
-            $unavailable = $res->status() === 404
-                && str_contains((string) $res->body(), 'no longer available');
-            if (!$unavailable) {
-                throw new RuntimeException($this->httpError($res->status(), $res->body()));
+
+            $body = (string) $res->body();
+            $lastError = $this->httpError($res->status(), $body);
+
+            // Retirement and free-tier quota are both counted per model, so the
+            // next candidate can still answer after one of them is used up.
+            $retired = $res->status() === 404 && str_contains($body, 'no longer available');
+            if (!$retired && !$this->isQuotaExhausted($res->status(), $body)) {
+                throw new RuntimeException($lastError);
             }
         }
 
         if ($res === null || !$res->successful()) {
-            throw new RuntimeException($this->httpError($res?->status() ?? 0, $res?->body() ?? ''));
+            throw new RuntimeException($lastError ?? $this->httpError(0, ''));
         }
 
         $text = data_get($res->json(), 'candidates.0.content.parts.0.text');
@@ -306,10 +342,13 @@ PROMPT;
         ) {
             return 'The scan service is not available right now. Try again later.';
         }
+        if ($this->isQuotaExhausted($status, $body)) {
+            return $this->isDailyQuota($body)
+                ? 'The daily free limit for photo scanning is used up. It resets tomorrow.'
+                : 'The scan service is busy. Wait a moment and try again.';
+        }
         if (
             $status === 429
-            || $apiStatus === 'RESOURCE_EXHAUSTED'
-            || str_contains($apiMessage, 'quota')
             || str_contains($apiMessage, 'rate')
         ) {
             return 'The scan service is busy. Wait a moment and try again.';
@@ -319,5 +358,24 @@ PROMPT;
         }
 
         return 'Could not analyze this photo. Try a clearer photo of the sheet.';
+    }
+
+    private function isQuotaExhausted(int $status, string $body): bool
+    {
+        if ($status !== 429) {
+            return false;
+        }
+
+        $decoded = json_decode($body, true);
+        $apiStatus = is_array($decoded) ? (string) data_get($decoded, 'error.status', '') : '';
+
+        return $apiStatus === 'RESOURCE_EXHAUSTED'
+            || str_contains(strtolower($body), 'quota');
+    }
+
+    /** Free-tier buckets are either per-minute or per-day; only the latter needs a wait until tomorrow. */
+    private function isDailyQuota(string $body): bool
+    {
+        return str_contains($body, 'PerDay');
     }
 }
