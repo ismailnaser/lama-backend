@@ -85,6 +85,22 @@ class PatientApiTest extends TestCase
         $this->assertSame(2, Patient::query()->count());
     }
 
+    public function test_same_id_next_clinic_day_is_allowed_across_utc_midnight(): void
+    {
+        $token = $this->issueToken($this->createUser());
+        $this->apiPost('/api/patients', $this->patientPayload([
+            'id_no' => '128',
+            'recorded_at' => '2026-09-02T12:00:00Z',
+        ]), $token)->assertCreated();
+
+        $this->apiPost('/api/patients', $this->patientPayload([
+            'id_no' => '128',
+            'recorded_at' => '2026-09-02T22:00:00Z',
+        ]), $token)->assertCreated();
+
+        $this->assertSame(2, Patient::query()->count());
+    }
+
     public function test_client_request_id_is_idempotent(): void
     {
         $token = $this->issueToken($this->createUser());

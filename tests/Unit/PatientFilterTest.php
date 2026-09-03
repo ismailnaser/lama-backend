@@ -8,11 +8,36 @@ use Tests\TestCase;
 
 class PatientFilterTest extends TestCase
 {
-    public function test_day_bounds_are_inclusive_calendar_day(): void
+    public function test_day_bounds_are_inclusive_clinic_calendar_day(): void
     {
+        $tz = Patient::clinicTimezone();
         [$start, $end] = Patient::dayBounds('2026-08-22');
-        $this->assertSame('2026-08-22 00:00:00', $start->format('Y-m-d H:i:s'));
-        $this->assertSame('2026-08-22 23:59:59', $end->format('Y-m-d H:i:s'));
+        $this->assertSame(
+            CarbonImmutable::parse('2026-08-22', $tz)->startOfDay()->utc()->format('Y-m-d H:i:s'),
+            $start->format('Y-m-d H:i:s')
+        );
+        $this->assertSame(
+            CarbonImmutable::parse('2026-08-22', $tz)->endOfDay()->utc()->format('Y-m-d H:i:s'),
+            $end->format('Y-m-d H:i:s')
+        );
+    }
+
+    public function test_utc_evening_counts_as_next_clinic_morning(): void
+    {
+        $keep = Patient::factory()->create([
+            'id_no' => '128',
+            'created_at' => CarbonImmutable::parse('2026-09-02 22:00:00', 'UTC'),
+            'updated_at' => CarbonImmutable::parse('2026-09-02 22:00:00', 'UTC'),
+        ]);
+
+        $this->assertSame(
+            [$keep->id],
+            Patient::query()->filter(['date' => '2026-09-03'])->pluck('id')->all()
+        );
+        $this->assertSame(
+            [],
+            Patient::query()->filter(['date' => '2026-09-02'])->pluck('id')->all()
+        );
     }
 
     public function test_filter_by_exact_id_and_date(): void
@@ -62,18 +87,18 @@ class PatientFilterTest extends TestCase
     {
         Patient::factory()->create([
             'id_no' => '101',
-            'created_at' => CarbonImmutable::parse('2026-08-01 00:00:01'),
-            'updated_at' => CarbonImmutable::parse('2026-08-01 00:00:01'),
+            'created_at' => CarbonImmutable::parse('2026-08-01 09:00:00'),
+            'updated_at' => CarbonImmutable::parse('2026-08-01 09:00:00'),
         ]);
         Patient::factory()->create([
             'id_no' => '102',
-            'created_at' => CarbonImmutable::parse('2026-08-03 23:59:00'),
-            'updated_at' => CarbonImmutable::parse('2026-08-03 23:59:00'),
+            'created_at' => CarbonImmutable::parse('2026-08-03 09:00:00'),
+            'updated_at' => CarbonImmutable::parse('2026-08-03 09:00:00'),
         ]);
         Patient::factory()->create([
             'id_no' => '103',
-            'created_at' => CarbonImmutable::parse('2026-08-04 00:00:01'),
-            'updated_at' => CarbonImmutable::parse('2026-08-04 00:00:01'),
+            'created_at' => CarbonImmutable::parse('2026-08-04 09:00:00'),
+            'updated_at' => CarbonImmutable::parse('2026-08-04 09:00:00'),
         ]);
 
         $this->assertSame(

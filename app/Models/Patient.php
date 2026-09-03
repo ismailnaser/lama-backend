@@ -74,21 +74,36 @@ class Patient extends Model
         return $query->whereBetween('created_at', [$start, $end]);
     }
 
+    public static function clinicTimezone(): string
+    {
+        $tz = trim((string) config('app.clinic_timezone', 'Asia/Gaza'));
+        return $tz !== '' ? $tz : 'Asia/Gaza';
+    }
+
     /**
-     * Inclusive calendar-day bounds that keep created_at filters index-friendly.
+     * Inclusive clinic-calendar-day bounds, returned in UTC for timestamp columns.
      *
      * @return array{0: CarbonImmutable, 1: CarbonImmutable}
      */
     public static function dayBounds(mixed $from, mixed $to = null): array
     {
-        $start = $from instanceof CarbonImmutable
-            ? $from->startOfDay()
-            : CarbonImmutable::parse($from)->startOfDay();
+        $tz = self::clinicTimezone();
+        $start = self::toClinicDay($from, $tz)->startOfDay()->utc();
         $endSource = $to ?? $from;
-        $end = $endSource instanceof CarbonImmutable
-            ? $endSource->endOfDay()
-            : CarbonImmutable::parse($endSource)->endOfDay();
+        $end = self::toClinicDay($endSource, $tz)->endOfDay()->utc();
 
         return [$start, $end];
+    }
+
+    private static function toClinicDay(mixed $value, string $tz): CarbonImmutable
+    {
+        if ($value instanceof \DateTimeInterface) {
+            return CarbonImmutable::parse($value)->timezone($tz);
+        }
+        $s = trim((string) $value);
+        if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $s)) {
+            return CarbonImmutable::parse($s, $tz);
+        }
+        return CarbonImmutable::parse($s)->timezone($tz);
     }
 }

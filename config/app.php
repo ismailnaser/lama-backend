@@ -68,6 +68,13 @@ return [
     'timezone' => env('APP_TIMEZONE', 'UTC'),
 
     /*
+    | Calendar days for patient logs (duplicate ID checks and date filters).
+    | Keep this on the clinic's local timezone so 2 September means 2 September
+    | on site, not the UTC date which can slip to the previous/next day.
+    */
+    'clinic_timezone' => env('CLINIC_TIMEZONE', 'Asia/Gaza'),
+
+    /*
     |--------------------------------------------------------------------------
     | Application Locale Configuration
     |--------------------------------------------------------------------------

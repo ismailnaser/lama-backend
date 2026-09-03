@@ -320,8 +320,8 @@ class PatientController extends Controller
                 $escape($p->lab ? 'Yes' : 'No'),
                 $escape($p->burn ? 'Yes' : 'No'),
                 $escape($p->notes),
-                $escape(optional($p->created_at)?->format('d-M-Y')),
-                $escape(optional($p->created_at)?->format('H:i')),
+                $escape(optional($p->created_at)?->timezone(Patient::clinicTimezone())->format('d-M-Y')),
+                $escape(optional($p->created_at)?->timezone(Patient::clinicTimezone())->format('H:i')),
             ]);
         }
 
